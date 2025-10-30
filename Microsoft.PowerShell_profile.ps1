@@ -242,6 +242,11 @@ function SS {
 
 
 #GIT
+function G_CleanReset {
+    git fetch origin
+    git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+    git clean -fdx
+}
 
 function G_DefaultOriginBranch {
     try {

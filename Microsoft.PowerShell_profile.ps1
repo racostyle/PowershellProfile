@@ -246,6 +246,12 @@ function G_CleanReset {
     git fetch origin
     git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
     git clean -fdx
+
+     Write-Host "Running dotnet restore..." -ForegroundColor Cyan
+    dotnet restore
+
+    Write-Host "Running dotnet build..." -ForegroundColor Cyan
+    dotnet build
 }
 
 function G_DefaultOriginBranch {

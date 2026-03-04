@@ -325,15 +325,22 @@ function G_Push {
     Push-Location $repositoryPath
 
     try {
+        $currentBranch = git rev-parse --abbrev-ref HEAD
+
+        git fetch origin $currentBranch 2>$null
+        $behindCount = git rev-list --count "HEAD..origin/$currentBranch" 2>$null
+        if ($behindCount -and [int]$behindCount -gt 0) {
+            Write-Host "Remote branch 'origin/$currentBranch' has $behindCount commit(s) that are not in your local branch."
+            Write-Host "Please pull the latest changes before pushing. Aborting."
+            return
+        }
+
         git add .
 
         Write-Host "Staged changes:"
         git status
 
         git commit -m "$CommitMessage"
-
-        # Detect current branch
-        $currentBranch = git rev-parse --abbrev-ref HEAD
 
         $confirmation = Read-Host "Are you sure you want to push changes to '$currentBranch'? (y/n)"
         if ($confirmation -eq 'y') {

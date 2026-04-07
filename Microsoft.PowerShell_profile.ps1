@@ -440,18 +440,30 @@ function G_BranchCleanup {
         [string]$KeepBranch
     )
 
+    $protectedBranches = @('main', 'master', $KeepBranch)
+
     Write-Host "Pruning remote tracking branches..." -ForegroundColor Cyan
     git fetch --prune
 
     Write-Host "Deleting local branches merged into '$KeepBranch'..." -ForegroundColor Cyan
     git branch --merged $KeepBranch | ForEach-Object {
-        $branch = $_.Trim()
+        $rawBranch = $_
 
-        # Skip the branch we want to keep
-        if ($branch -ne $KeepBranch -and $branch -ne "* $KeepBranch") {
-            Write-Host "Removing branch: $branch" -ForegroundColor Yellow
-            git branch -d $branch
+        # Remove leading "* " from current branch line, then trim whitespace
+        $branch = $rawBranch -replace '^\*\s+', ''
+        $branch = $branch.Trim()
+
+        if ($protectedBranches -contains $branch) {
+            Write-Host "Keeping protected branch: $branch" -ForegroundColor DarkGray
+            return
         }
+
+        if ([string]::IsNullOrWhiteSpace($branch)) {
+            return
+        }
+
+        Write-Host "Removing branch: $branch" -ForegroundColor Yellow
+        git branch -d $branch
     }
 }
 

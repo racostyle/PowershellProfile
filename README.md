@@ -1,88 +1,48 @@
-# 🧩 PowerShell Profile Utilities
+# PowerShell Profile Utilities
 
-This profile extends PowerShell with developer-friendly commands for **Git**, **system automation**, and **quick navigation**.
-It’s designed to be self-contained and portable — no secrets, no machine-locked paths.
+This profile adds helper commands for Git, navigation, diagnostics, and daily developer workflows.
+It is designed to stay portable and avoid user-specific hardcoded paths.
 
----
+## Files
 
-## 📁 Structure
+- `Microsoft.PowerShell_profile.ps1`: main profile script.
+- `UserVars.ps1`: user variables (paths and other personal environment values).
+- `UserProfileExtensions.ps1`: user-specific settings and methods.
 
-| File                               | Purpose                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| `Microsoft.PowerShell_profile.ps1` | Main startup script that imports aliases, functions, and user variables.        |
-| `UserVars.ps1`                     | Centralized path and user-specific variable definitions (all environment-safe). |
+## Startup behavior
 
----
+On startup, the profile:
 
-## ⚙️ Setup
+- looks for `UserVars.ps1` and `UserProfileExtensions.ps1` in:
+  - `$HOME\Documents\WindowsPowerShell\`
+  - `$HOME\Documents\PowerShell\`
+  - profile script folder (`$PSScriptRoot`)
+- creates missing files automatically
+- writes minimal required defaults into a newly created `UserVars.ps1`:
+  - `$user = $HOME`
+  - `$repos = Join-Path $user "source\repos"`
+- prints guidance so you can complete your own values/settings
+- dot-sources both files
+- changes location to `$repos` only when it exists
 
-1. Place both files in your PowerShell profile directory:
+## What to put in user files
 
-   ```
-   $PROFILE
-   $PROFILE directory: $env:USERPROFILE\Documents\PowerShell\
-   ```
+- `UserVars.ps1`: variables like `$repos`, `$desktop`, `$documents`, `$downloads`, project path shortcuts, etc.
+- `UserProfileExtensions.ps1`: user preferences and optional custom functions, for example:
+  - `[System.Globalization.CultureInfo]::CurrentCulture = 'sl-SI'`
 
-2. Adjust any paths inside `UserVars.ps1` to your local structure if needed.
+## Key functions
 
-3. Restart PowerShell.
+- `G_CleanReset`: fetches, hard-resets to upstream branch, previews ignored and untracked cleanup separately, and asks for confirmation before deletion.
+- `G_BranchCleanup <KeepBranch>`: prunes remotes and interactively asks per merged branch whether to delete it.
+- `G_DefaultOriginBranch`: detects remote default branch.
+- `G_FetchReset [path]`: fetches and pulls latest changes for repo path.
+- `G_Push "message"`: stages, commits, and pushes current branch with confirmation.
+- `G_Init <originUrl>`: initializes repository and links remote origin.
+- `G_CopyBranch`: copies current branch name to clipboard.
 
----
+## Notes
 
-## 🧠 Key Functions
-
-### Git Helpers
-
-| Function                      | Description                                                                                |
-| ----------------------------- | ------------------------------------------------------------------------------------------ |
-| **`G_Push "message"`**        | Stages, commits, and pushes to the current branch. Automatically sets upstream if missing. |
-| **`G_FetchReset [path]`**     | Fetches and pulls the latest changes for a repository (default = current folder).          |
-| **`G_Init <originUrl>`**      | Initializes a new Git repo, adds remote, and syncs with its default branch.                |
-| **`Copy-GitBranch`**          | Copies the current Git branch name to clipboard.                                           |
-| **`Get-DefaultOriginBranch`** | Detects the default branch of the remote (`main`, `master`, etc.).                         |
-
-## 🧩 Environment Variables
-
-Defined in **`UserVars.ps1`**, these make the scripts portable:
-
-```powershell
-$user      = $env:USERPROFILE
-$repos     = Join-Path $user "source\repos"
-$desktop   = Join-Path $user "Desktop"
-$appdata   = Join-Path $user "AppData"
-$documents = Join-Path $user "Documents"
-$downloads = Join-Path $user "Downloads"
-```
-
-You can extend this with project-specific paths (`$gdrive`, `$rdcs`, etc.), but they are optional.
-
----
-
-## 🧹 Guidelines
-
-- Avoid running Git operations automatically at shell startup — use functions instead.
-- Replace any hard-coded `C:\Users\<User>` paths with `$env:USERPROFILE`.
-- No private tokens or credentials should be stored in these scripts.
-- Use the included `G_DefaultOriginBranch` to avoid assuming `main`.
-
----
-
-## 🧩 Example Usage
-
-```powershell
-PS> cd $repos\MyProject
-PS> G_Push "Fixed logging bug"
-Pushed to origin/main.
-
-PS> Copy-GitBranch
-Copied branch: main
-
-PS> G_Init https://github.com/YourUser/NewRepo.git
-Initialized and synced with origin/main.
-```
-
----
-
-## 🪶 License
-
-Free to use, modify, and share.
+- Keep credentials/secrets out of profile scripts.
+- Prefer `$HOME`, `$env:USERPROFILE`, and `Join-Path` over absolute user paths.
+- Review branch and cleanup prompts carefully before confirming delete operations.

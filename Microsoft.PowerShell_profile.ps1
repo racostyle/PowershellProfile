@@ -23,11 +23,93 @@ Set-Alias gh Get-Help
 
 [System.Console]::WindowWidth = 200
 [System.Console]::WindowHeight = 50
-[System.Globalization.CultureInfo]::CurrentCulture = 'sl-SI'
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-# Load user data
-. "C:\Users\<user>\Documents\WindowsPowerShell\UserVars.ps1"
+# Load user files
+function Ensure-UserProfileFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FileName,
+        [string[]]$Candidates
+    )
+
+    $existingPath = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($existingPath) {
+        return [pscustomobject]@{
+            Path = $existingPath
+            Created = $false
+        }
+    }
+
+    $targetPath = $null
+    foreach ($candidate in $Candidates) {
+        $parent = Split-Path -Path $candidate -Parent
+        if (Test-Path $parent) {
+            $targetPath = $candidate
+            break
+        }
+    }
+
+    if (-not $targetPath) {
+        $targetPath = $Candidates[0]
+        $targetParent = Split-Path -Path $targetPath -Parent
+        New-Item -ItemType Directory -Path $targetParent -Force | Out-Null
+    }
+
+    New-Item -ItemType File -Path $targetPath -Force | Out-Null
+    if ($FileName -eq "UserVars.ps1") {
+        $defaultVars = @(
+            '$user = $HOME',
+            '$repos = Join-Path $user "source\repos"'
+        ) -join [Environment]::NewLine
+        Set-Content -Path $targetPath -Value $defaultVars -Encoding UTF8
+    }
+    Write-Host "Created '$FileName' at '$targetPath'." -ForegroundColor Yellow
+    if ($FileName -eq "UserVars.ps1") {
+        Write-Host "Please fill it with user variable declarations (for example: `$user, `$repos, `$desktop, `$documents)." -ForegroundColor Yellow
+    }
+    elseif ($FileName -eq "UserProfileExtensions.ps1") {
+        Write-Host "Please fill it with user-specific settings/methods (for example: [System.Globalization.CultureInfo]::CurrentCulture = 'sl-SI')." -ForegroundColor Yellow
+    }
+    return [pscustomobject]@{
+        Path = $targetPath
+        Created = $true
+    }
+}
+
+$userVarsCandidates = @(
+    (Join-Path $HOME "Documents\WindowsPowerShell\UserVars.ps1"),
+    (Join-Path $HOME "Documents\PowerShell\UserVars.ps1"),
+    (Join-Path $PSScriptRoot "UserVars.ps1")
+)
+$userProfileExtensionsCandidates = @(
+    (Join-Path $HOME "Documents\WindowsPowerShell\UserProfileExtensions.ps1"),
+    (Join-Path $HOME "Documents\PowerShell\UserProfileExtensions.ps1"),
+    (Join-Path $PSScriptRoot "UserProfileExtensions.ps1")
+)
+
+$userVarsInfo = Ensure-UserProfileFile -FileName "UserVars.ps1" -Candidates $userVarsCandidates
+$userProfileExtensionsInfo = Ensure-UserProfileFile -FileName "UserProfileExtensions.ps1" -Candidates $userProfileExtensionsCandidates
+
+if ($userVarsInfo.Created -or $userProfileExtensionsInfo.Created) {
+    $createdFiles = @()
+    if ($userVarsInfo.Created) { $createdFiles += "UserVars.ps1" }
+    if ($userProfileExtensionsInfo.Created) { $createdFiles += "UserProfileExtensions.ps1" }
+    Write-Host "Created setup file(s): $($createdFiles -join ', ')." -ForegroundColor Yellow
+    Write-Host "PowerShell profile loading was intentionally stopped so these setup messages remain visible." -ForegroundColor Yellow
+    Write-Host "Fill the new file(s), then restart PowerShell to load the full profile." -ForegroundColor Yellow
+    return
+}
+
+. $userVarsInfo.Path
+. $userProfileExtensionsInfo.Path
+
+if ($repos -and (Test-Path $repos)) {
+    Set-Location $repos
+}
+else {
+    Write-Host "Variable '$repos' is missing or path does not exist. Staying in current location." -ForegroundColor Yellow
+}
 
 $host.UI.RawUI.BackgroundColor = "Black"
 $host.UI.RawUI.ForegroundColor = "White"
@@ -35,10 +117,6 @@ $host.UI.RawUI.ForegroundColor = "White"
 $host.PrivateData.ErrorBackgroundColor = "Gray"
 $host.PrivateData.ErrorForegroundColor = "Red"
 
-function gs { git status }
-function gss { git status -s }
-
-Set-Location $repos
 Clear-Host
 
 #HELPERS
@@ -242,6 +320,9 @@ function SS {
 
 
 #GIT
+function gs { git status }
+function gss { git status -s }
+
 function G_CleanReset {
     git fetch
 

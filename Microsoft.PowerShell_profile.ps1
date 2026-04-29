@@ -478,30 +478,48 @@ function G_BranchCleanup {
         [string]$KeepBranch
     )
 
-    $protectedBranches = @('main', 'master', $KeepBranch)
+    $currentBranch = git rev-parse --abbrev-ref HEAD 2>$null
+    if (-not $currentBranch) {
+        Write-Host "Not inside a Git repository." -ForegroundColor Red
+        return
+    }
+
+    # Protect common mainline branches, the keep branch, and the currently checked out branch.
+    $protectedBranches = @('main', 'master', $KeepBranch, $currentBranch) | Select-Object -Unique
 
     Write-Host "Pruning remote tracking branches..." -ForegroundColor Cyan
     git fetch --prune
 
-    Write-Host "Deleting local branches merged into '$KeepBranch'..." -ForegroundColor Cyan
-    git branch --merged $KeepBranch | ForEach-Object {
-        $rawBranch = $_
+    Write-Host "Finding local branches merged into '$KeepBranch'..." -ForegroundColor Cyan
+    $mergedBranches = git branch --merged $KeepBranch --format="%(refname:short)" 2>$null |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-        # Remove leading "* " from current branch line, then trim whitespace
-        $branch = $rawBranch -replace '^\*\s+', ''
-        $branch = $branch.Trim()
+    if (-not $mergedBranches) {
+        Write-Host "No merged local branches found for '$KeepBranch'." -ForegroundColor DarkGray
+        return
+    }
 
+    foreach ($branch in $mergedBranches) {
         if ($protectedBranches -contains $branch) {
             Write-Host "Keeping protected branch: $branch" -ForegroundColor DarkGray
-            return
+            continue
         }
 
-        if ([string]::IsNullOrWhiteSpace($branch)) {
-            return
+        $choice = Read-Host "Delete branch '$branch'? (y = yes, n = no, q = quit)"
+        switch ($choice.ToLower()) {
+            'y' {
+                Write-Host "Removing branch: $branch" -ForegroundColor Yellow
+                git branch -d -- $branch
+            }
+            'q' {
+                Write-Host "Branch cleanup stopped by user." -ForegroundColor Yellow
+                break
+            }
+            default {
+                Write-Host "Skipping branch: $branch" -ForegroundColor DarkGray
+            }
         }
-
-        Write-Host "Removing branch: $branch" -ForegroundColor Yellow
-        git branch -d $branch
     }
 }
 

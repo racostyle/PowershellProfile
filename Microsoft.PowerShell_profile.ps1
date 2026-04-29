@@ -243,15 +243,53 @@ function SS {
 
 #GIT
 function G_CleanReset {
-    git fetch origin
-    git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
-    git clean -fdx
+    git fetch
 
-     Write-Host "Running dotnet restore..." -ForegroundColor Cyan
-    dotnet restore
+    $upstream = git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>$null
+    if (-not $upstream) {
+        Write-Host "No upstream branch configured for current branch." -ForegroundColor Red
+        Write-Host "Set upstream first (example: git branch --set-upstream-to=origin/<branch>)." -ForegroundColor Yellow
+        return
+    }
 
-    Write-Host "Running dotnet build..." -ForegroundColor Cyan
-    dotnet build
+    Write-Host "Resetting tracked files to $upstream..." -ForegroundColor Cyan
+    git reset --hard $upstream
+
+    Write-Host ""
+    Write-Host "Preview of ignored leftovers to remove (safe cleanup):" -ForegroundColor Cyan
+    $ignoredPreview = git clean -fdXn
+    if ($ignoredPreview) {
+        $ignoredPreview | ForEach-Object { Write-Host $_ }
+        $ignoredConfirmation = Read-Host "Remove ignored leftovers above? (y/n)"
+        if ($ignoredConfirmation -eq 'y') {
+            git clean -fdX
+            Write-Host "Ignored leftovers cleaned." -ForegroundColor Green
+        }
+        else {
+            Write-Host "Ignored leftovers cleanup skipped." -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "No ignored leftovers found." -ForegroundColor DarkGray
+    }
+
+    Write-Host ""
+    Write-Host "Preview of untracked non-ignored files/folders (e.g., leftover classes):" -ForegroundColor Cyan
+    $untrackedPreview = git clean -fdn
+    if ($untrackedPreview) {
+        $untrackedPreview | ForEach-Object { Write-Host $_ }
+        $untrackedConfirmation = Read-Host "Remove untracked non-ignored files/folders above? (y/n)"
+        if ($untrackedConfirmation -eq 'y') {
+            git clean -fd
+            Write-Host "Untracked non-ignored files/folders cleaned." -ForegroundColor Green
+        }
+        else {
+            Write-Host "Untracked non-ignored cleanup skipped." -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "No untracked non-ignored files/folders found." -ForegroundColor DarkGray
+    }
 }
 
 function G_DefaultOriginBranch {
